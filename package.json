@@ -1,0 +1,13 @@
+{
+  "name": "agent-control-terrarium",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Terrarium plugin for Agent Control: a living, psychedelic world that grows from your workspace's activity.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs --check && node --test test/*.test.mjs"
+  },
+  "engines": { "node": ">=22" }
+}

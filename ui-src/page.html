@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terrarium</title>
+<!--
+  Terrarium. Built by scripts/build.mjs from ui-src/ (edit there, then `npm run build`). Agent Control shows this page in
+  a sandboxed iframe (scripts only, no same-origin), so it is one file; data comes through the dashboard's bridge
+  (postMessage to the parent, which only forwards requests to this plugin's own routes). Opened on its own, it runs a
+  demo pulse with pretend agents.
+-->
+<style>
+  :root {
+    --accent: #b28cff; --text: #f1ecff; --muted: rgba(225,215,255,.66); --glass: rgba(14,9,32,.56); --glass-strong: rgba(14,9,32,.82);
+    --line: rgba(220,200,255,.16); --line-strong: rgba(220,200,255,.32); --radius: 14px; --name-l: 74%;
+    --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: dark;
+  }
+  :root[data-mode="light"] { --text: #1d1530; --muted: rgba(40,28,70,.66); --glass: rgba(255,252,255,.62); --glass-strong: rgba(255,252,255,.9); --line: rgba(60,30,120,.14); --line-strong: rgba(60,30,120,.3); --name-l: 34%; color-scheme: light; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #07040f; color: var(--text); font: 13px/1.4 var(--font); }
+  body { -webkit-font-smoothing: antialiased; }
+  #stage { position: fixed; inset: 0; transition: filter .55s cubic-bezier(.2,.7,.2,1), transform .55s cubic-bezier(.2,.7,.2,1); }
+  #stage.warp { filter: blur(14px) saturate(2.6) hue-rotate(80deg) brightness(1.5); transform: scale(1.06); }
+  #stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #fx { cursor: crosshair; }
+  #fx.pointing { cursor: pointer; }
+
+  .glass { background: var(--glass); border: 1px solid var(--line); border-radius: var(--radius); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+  button { font: inherit; color: inherit; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 34px; height: 34px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); cursor: pointer; transition: border-color .2s, transform .15s, background .2s; white-space: nowrap; }
+  .btn:hover { border-color: var(--accent); }
+  .btn:active { transform: scale(.95); }
+  .btn.on { background: color-mix(in srgb, var(--accent) 34%, var(--glass)); border-color: var(--accent); }
+  .btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  #top { position: fixed; top: 12px; left: 12px; right: 12px; display: flex; align-items: flex-start; gap: 10px; pointer-events: none; z-index: 5; }
+  #top > * { pointer-events: auto; }
+  #title { padding: 10px 16px 11px; max-width: min(560px, 60vw); }
+  #kicker { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  #kicker .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: beat 2.4s ease-in-out infinite; }
+  @keyframes beat { 50% { transform: scale(1.6); opacity: .5; } }
+  #name { margin: 3px 0 2px; font-size: clamp(17px, 2.4vw, 24px); font-weight: 750; letter-spacing: -.01em; line-height: 1.15;
+    background: linear-gradient(90deg, #ffd1f5, #b9a2ff, #8ff5ff, #ffe39b, #ffd1f5); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 14s linear infinite; }
+  :root[data-mode="light"] #name { background-image: linear-gradient(90deg, #b0168a, #5b3fd6, #087f9b, #b36b00, #b0168a); }
+  @keyframes shimmer { to { background-position: 300% 0; } }
+  #meta { color: var(--muted); font-size: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+  #meta b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .spacer { flex: 1; }
+  #actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+  .drawer { position: fixed; top: 104px; bottom: 96px; width: min(330px, calc(100vw - 24px)); overflow: auto; padding: 14px; z-index: 6; transition: transform .35s cubic-bezier(.2,.8,.2,1), opacity .35s; scrollbar-width: thin; }
+  #controls { left: 12px; }
+  #bestiary { right: 12px; }
+  .drawer.closed { opacity: 0; pointer-events: none; }
+  #controls.closed { transform: translateX(-24px); }
+  #bestiary.closed { transform: translateX(24px); }
+  h2 { margin: 0 0 10px; font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+  h2:not(:first-child) { margin-top: 18px; }
+  .seg { display: flex; padding: 3px; border-radius: 999px; border: 1px solid var(--line); gap: 2px; }
+  .seg button { flex: 1; border: 0; background: transparent; padding: 6px 8px; border-radius: 999px; cursor: pointer; color: var(--muted); }
+  .seg button.on { background: color-mix(in srgb, var(--accent) 36%, transparent); color: var(--text); }
+  .field { margin: 10px 0; }
+  .field label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .field label span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .field small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+  input[type=range] { width: 100%; appearance: none; -webkit-appearance: none; height: 6px; border-radius: 99px; background: linear-gradient(90deg, var(--from, #355), var(--to, #f6c)); outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); box-shadow: 0 0 12px var(--accent); cursor: pointer; }
+  input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); cursor: pointer; }
+  input[type=range]:disabled { opacity: .55; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  input[type=text] { flex: 1; min-width: 0; height: 32px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.18); color: var(--text); padding: 0 10px; font: inherit; }
+  :root[data-mode="light"] input[type=text] { background: rgba(255,255,255,.6); }
+  .check { display: flex; gap: 8px; align-items: center; margin-top: 8px; color: var(--muted); cursor: pointer; }
+  .note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+  .wide { width: 100%; margin-top: 8px; white-space: normal; height: auto; min-height: 34px; padding: 7px 12px; }
+
+  .worlds { display: grid; gap: 6px; }
+  .world { display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 10px; border-radius: 10px; border: 1px solid var(--line); cursor: pointer; transition: border-color .2s; }
+  .world:hover { border-color: var(--accent); }
+  .world .swatch { width: 22px; height: 22px; border-radius: 7px; flex: none; }
+  .world .wname { flex: 1; min-width: 0; font-size: 12px; }
+  .world .wname div:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .world .wname div:last-child { color: var(--muted); font-size: 11px; }
+  .world .x { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 15px; padding: 0 4px; }
+  .badge { font-size: 9.5px; text-transform: uppercase; letter-spacing: .1em; padding: 1px 6px; border-radius: 99px; border: 1px solid var(--line-strong); color: var(--muted); }
+
+  .card { display: grid; grid-template-columns: 58px 1fr; gap: 10px; padding: 9px; border-radius: 12px; border: 1px solid var(--line); margin-bottom: 8px; cursor: pointer; transition: border-color .2s, background .2s; }
+  .card:hover, .card.on { border-color: var(--accent); }
+  .card.on { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .card.extinct { opacity: .5; }
+  .card canvas { width: 58px; height: 58px; border-radius: 10px; background: radial-gradient(circle, rgba(255,255,255,.08), rgba(0,0,0,.25)); }
+  .card .cname { font-weight: 700; font-size: 13.5px; }
+  .card .ctitle { color: var(--muted); font-size: 11.5px; font-style: italic; margin-bottom: 4px; }
+  .card .tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 3px; }
+  .card .tags span { font-size: 10px; padding: 1px 7px; border-radius: 99px; background: rgba(255,255,255,.08); }
+  :root[data-mode="light"] .card .tags span { background: rgba(60,30,120,.08); }
+  .card .pop { font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--muted); }
+  .card .pop b { color: var(--text); }
+  .card .web { font-size: 11px; color: var(--muted); }
+  #lore { white-space: pre-wrap; font-size: 12px; color: var(--muted); }
+
+  #bottom { position: fixed; left: 12px; right: 12px; bottom: 12px; height: 72px; z-index: 5; display: flex; gap: 10px; pointer-events: none; }
+  #bottom > * { pointer-events: auto; }
+  #chartbox { flex: 1; position: relative; overflow: hidden; padding: 0; }
+  #chart { width: 100%; height: 100%; display: block; }
+  #chartlabel { position: absolute; left: 12px; top: 7px; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); pointer-events: none; }
+  #clock { width: 72px; display: grid; place-items: center; font-size: 26px; padding: 0; }
+  #chronicle { position: fixed; left: 16px; bottom: 96px; max-width: min(460px, 70vw); z-index: 4; pointer-events: none; display: flex; flex-direction: column; gap: 4px; }
+  #chronicle div { align-self: flex-start; font-size: 12px; padding: 4px 10px; border-radius: 99px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: rise .5s cubic-bezier(.2,.8,.2,1); transition: opacity 1.2s; }
+  @keyframes rise { from { transform: translateY(8px); opacity: 0; } }
+  #tip { position: fixed; z-index: 9; pointer-events: none; padding: 6px 10px; font-size: 12px; border-radius: 10px; background: var(--glass-strong); border: 1px solid var(--line-strong); opacity: 0; transition: opacity .15s; max-width: 260px; }
+  #tip b { display: block; }
+  #tip span { color: var(--muted); }
+  #nogl { position: fixed; inset: 0; display: none; place-items: center; text-align: center; color: var(--muted); }
+  @media (max-width: 640px) {
+    #title { max-width: calc(100vw - 24px); }
+    #top { flex-wrap: wrap; }
+    #actions { width: 100%; justify-content: flex-start; }
+    .drawer { top: 150px; }
+    #clock { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { #name, #kicker .dot { animation: none; } #stage { transition: none; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl"></canvas>
+  <canvas id="trails"></canvas>
+  <canvas id="fx"></canvas>
+</div>
+<div id="nogl">This browser could not start WebGL, which the Terrarium needs to paint its worlds.</div>
+
+<div id="top">
+  <div id="title" class="glass">
+    <div id="kicker"><span class="dot"></span><span id="source">Terrarium</span></div>
+    <div id="name">Germinating…</div>
+    <div id="meta"></div>
+  </div>
+  <div class="spacer"></div>
+  <div id="actions">
+    <button class="btn" id="b-controls" title="Parameters and worlds (C)"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+    <button class="btn" id="b-bestiary" title="Bestiary (B)"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 8h6M9 12h4"/></svg></button>
+    <button class="btn" id="b-new" title="Dream a new world (N)"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.9L19 9.7l-4.3 3 1.3 5.3L12 15.2 8 18l1.3-5.3L5 9.7l5.2-1.8z"/></svg><span>Dream</span></button>
+    <button class="btn" id="b-keep" title="Keep this world"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
+    <button class="btn" id="b-pause" title="Pause (space)"><svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg></button>
+    <button class="btn" id="b-tall" title="Make the page taller" hidden><svg viewBox="0 0 24 24"><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/></svg></button>
+  </div>
+</div>
+
+<aside id="controls" class="drawer glass closed">
+  <h2>Source</h2>
+  <div class="seg" id="seg"><button data-src="pulse" id="s-pulse">Your workspace</button><button data-src="dream" id="s-dream">Dream</button></div>
+  <p class="note" id="srcnote"></p>
+  <h2>Seed</h2>
+  <div class="row"><input type="text" id="seed" maxlength="80" spellcheck="false"><button class="btn" id="b-dice" title="Random seed"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="15" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="9" cy="15" r="1"/></svg></button></div>
+  <h2>Parameters</h2>
+  <div id="sliders"></div>
+  <label class="check"><input type="checkbox" id="drift"> Drift: dream a new world every 3 minutes</label>
+  <button class="btn wide" id="b-fork" hidden>Copy this world into Dream mode</button>
+  <h2>Kept worlds</h2>
+  <div class="worlds" id="worlds"></div>
+  <p class="note" id="worldsnote"></p>
+</aside>
+
+<aside id="bestiary" class="drawer glass closed">
+  <h2>Bestiary</h2>
+  <div id="cards"></div>
+  <h2>Field notes</h2>
+  <div id="lore"></div>
+</aside>
+
+<div id="chronicle"></div>
+<div id="bottom">
+  <div id="chartbox" class="glass"><canvas id="chart"></canvas><div id="chartlabel">Population</div></div>
+  <div id="clock" class="glass" title="Day and night">☀</div>
+</div>
+<div id="tip"></div>
+
+<script type="module">
+/*GENESIS*/
+/*APP*/
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+{
+  "id": "terrarium",
+  "name": "Terrarium",
+  "version": "1.0.0",
+  "sdk": 1,
+  "description": "A living, slightly psychedelic world that grows from your workspace: busy agents warm it up, deliveries make it teem with life, failures and debates make it weird. Running tasks drift through it as glowing spirits. Or dream your own worlds from five sliders, and let agents dream some too.",
+  "author": "Remco Eijsackers",
+  "homepage": "https://github.com/remcoeijsackers/agent-control-terrarium",
+  "permissions": ["db", "routes", "tools", "events", "settings"],
+  "main": "index.mjs",
+  "settings": [
+    { "key": "trippiness", "label": "Extra trippiness", "type": "number", "min": 0, "max": 1, "placeholder": "0", "help": "Added to the weirdness your workspace earns by itself. 0 is natural, 1 melts everything." },
+    { "key": "days", "label": "Pulse window (days)", "type": "number", "min": 1, "max": 30, "placeholder": "7", "help": "How many days of activity shape the world." },
+    { "key": "start", "label": "Open in", "type": "select", "options": [{ "value": "pulse", "label": "Your workspace's world" }, { "value": "dream", "label": "Dream mode (a new world every few minutes)" }] }
+  ],
+  "nav": [{ "id": "terrarium", "label": "Terrarium", "page": "index.html" }],
+  "tables": ["tasks", "beats", "worlds"],
+  "tools": [
+    {
+      "name": "dream_world",
+      "description": "Dream up a new world for the Terrarium page and keep it in this workspace's gallery. Every number is 0..1 and optional (left out = surprise). Returns the world's field guide: its name, flora and species with their food web.",
+      "params": {
+        "name": { "type": "string", "description": "A name for the world (optional; otherwise it names itself)", "optional": true },
+        "seed": { "type": "string", "description": "Any word or phrase; the same seed grows the same world", "optional": true },
+        "heat": { "type": "number", "description": "0 frozen .. 1 scorching", "optional": true },
+        "water": { "type": "number", "description": "0 desert .. 1 ocean", "optional": true },
+        "life": { "type": "number", "description": "0 barren .. 1 teeming", "optional": true },
+        "weird": { "type": "number", "description": "0 natural .. 1 fully psychedelic", "optional": true },
+        "species": { "type": "number", "description": "How many species, 3..9", "optional": true },
+        "lore": { "type": "string", "description": "One or two sentences of lore, shown with the world", "optional": true }
+      }
+    },
+    {
+      "name": "describe_terrarium",
+      "description": "Describe this workspace's Terrarium right now: what the recent activity did to the climate, which species live there, who eats whom, and how many tasks drift through it as spirits.",
+      "params": {}
+    }
+  ],
+  "routes": [
+    { "method": "GET", "path": "/pulse" },
+    { "method": "GET", "path": "/worlds" },
+    { "method": "POST", "path": "/worlds" },
+    { "method": "DELETE", "path": "/worlds/:id" }
+  ],
+  "events": ["task.created", "task.status", "run.status", "board.message"]
+}
