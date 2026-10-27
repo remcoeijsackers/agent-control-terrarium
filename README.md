@@ -6,7 +6,7 @@
 Busy agents warm it up, deliveries make it teem with life, failures and debates make it weird.
 Running tasks drift through it as glowing spirits.
 
-[**Try the demo →**](https://remcoeijsackers.github.io/agent-control-terrarium/) &nbsp;·&nbsp; a plugin for [Agent Control](https://github.com/remcoeijsackers/agent-control)
+[**Try the demo →**](https://remcoeijsackers.github.io/mallows-plugin-terrarium/) &nbsp;·&nbsp; a plugin for [Agent Control](https://github.com/remcoeijsackers/agent-control)
 
 <img src="docs/hero.jpg" alt="A Terrarium world: green and pink islands with contour lines in a teal sea, full of grazers, serpents, jellies and spiky urchins" width="100%">
 
@@ -96,8 +96,8 @@ Species:
 In Agent Control: **Plugins → Browse**, find **Terrarium** and click **Install**. Then turn it on under
 **Plugins → Installed** for the workspaces you want, and open the **Terrarium** tab.
 
-Or install it from a folder: `POST /api/plugins/install {"path": "/path/to/agent-control-terrarium"}`, or
-`{"github": "remcoeijsackers/agent-control-terrarium"}`.
+Or install it from a folder: `POST /api/plugins/install {"path": "/path/to/mallows-plugin-terrarium"}`, or
+`{"github": "remcoeijsackers/mallows-plugin-terrarium"}`.
 
 Settings per workspace: **Extra trippiness** (0–1), **Pulse window** (1–30 days) and **Open in** (your workspace's world
 or Dream mode with drift).
