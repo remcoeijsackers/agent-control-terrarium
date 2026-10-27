@@ -5,7 +5,7 @@
   "sdk": 1,
   "description": "A living, slightly psychedelic world that grows from your workspace: busy agents warm it up, deliveries make it teem with life, failures and debates make it weird. Running tasks drift through it as glowing spirits. Or dream your own worlds from five sliders, and let agents dream some too.",
   "author": "Remco Eijsackers",
-  "homepage": "https://github.com/remcoeijsackers/agent-control-terrarium",
+  "homepage": "https://github.com/remcoeijsackers/mallows-plugin-terrarium",
   "permissions": ["db", "routes", "tools", "events", "settings"],
   "main": "index.mjs",
   "settings": [
